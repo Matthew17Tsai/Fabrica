@@ -1,0 +1,53 @@
+{
+  "category": "sweatpants",
+  "measurements": [
+    {
+      "id": "waist",
+      "label": "Waist Width",
+      "description": "Measured at top of waistband",
+      "toleranceInches": 0.5
+    },
+    {
+      "id": "inseam",
+      "label": "Inseam Length",
+      "description": "From crotch seam to bottom hem",
+      "toleranceInches": 0.5
+    },
+    {
+      "id": "outseam",
+      "label": "Outseam Length",
+      "description": "From waistband to bottom hem",
+      "toleranceInches": 0.5
+    },
+    {
+      "id": "hip",
+      "label": "Hip Width",
+      "description": "Measured at widest point",
+      "toleranceInches": 0.5
+    },
+    {
+      "id": "thigh",
+      "label": "Thigh Width",
+      "description": "Measured 1 inch below crotch",
+      "toleranceInches": 0.5
+    },
+    {
+      "id": "knee",
+      "label": "Knee Width",
+      "description": "Measured at knee point",
+      "toleranceInches": 0.25
+    },
+    {
+      "id": "leg_opening",
+      "label": "Leg Opening",
+      "description": "Width at bottom hem",
+      "toleranceInches": 0.25
+    },
+    {
+      "id": "rise",
+      "label": "Front Rise",
+      "description": "From crotch seam to waistband",
+      "toleranceInches": 0.25
+    }
+  ]
+}

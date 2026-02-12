@@ -1,0 +1,41 @@
+{
+  "category": "sweatshirt",
+  "measurements": [
+    {
+      "id": "chest",
+      "label": "Chest Width",
+      "description": "Measured 1 inch below armhole",
+      "toleranceInches": 0.5
+    },
+    {
+      "id": "length",
+      "label": "Body Length",
+      "description": "From HPS to bottom hem",
+      "toleranceInches": 0.5
+    },
+    {
+      "id": "shoulder",
+      "label": "Shoulder Width",
+      "description": "From shoulder seam to shoulder seam",
+      "toleranceInches": 0.25
+    },
+    {
+      "id": "sleeve",
+      "label": "Sleeve Length",
+      "description": "From shoulder seam to cuff edge",
+      "toleranceInches": 0.5
+    },
+    {
+      "id": "cuff_width",
+      "label": "Cuff Width",
+      "description": "Width of ribbed cuff when flat",
+      "toleranceInches": 0.25
+    },
+    {
+      "id": "hem_width",
+      "label": "Bottom Hem Width",
+      "description": "Width of ribbed hem when flat",
+      "toleranceInches": 0.5
+    }
+  ]
+}

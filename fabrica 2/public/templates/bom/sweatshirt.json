@@ -1,0 +1,55 @@
+{
+  "category": "sweatshirt",
+  "components": [
+    {
+      "id": "body_fabric",
+      "name": "Body Fabric",
+      "material": "French Terry",
+      "composition": "80% Cotton / 20% Polyester",
+      "weight": "280 GSM",
+      "supplier": "",
+      "color": "",
+      "notes": "Main body and sleeves"
+    },
+    {
+      "id": "rib_fabric",
+      "name": "Rib Fabric",
+      "material": "1x1 Rib",
+      "composition": "95% Cotton / 5% Spandex",
+      "weight": "240 GSM",
+      "supplier": "",
+      "color": "Match body",
+      "notes": "Cuffs, hem, and neckline"
+    },
+    {
+      "id": "main_label",
+      "name": "Main Label",
+      "material": "Woven label",
+      "composition": "Polyester",
+      "weight": "Standard",
+      "supplier": "",
+      "color": "",
+      "notes": "Inside back neck"
+    },
+    {
+      "id": "size_label",
+      "name": "Size Label",
+      "material": "Printed label",
+      "composition": "Polyester satin",
+      "weight": "Standard",
+      "supplier": "",
+      "color": "White",
+      "notes": "Inside side seam"
+    },
+    {
+      "id": "thread",
+      "name": "Sewing Thread",
+      "material": "Poly-poly thread",
+      "composition": "100% Polyester",
+      "weight": "40/2",
+      "supplier": "",
+      "color": "Match body",
+      "notes": "All construction"
+    }
+  ]
+}
