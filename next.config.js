@@ -5,7 +5,11 @@ const nextConfig = {
   },
   allowedDevOrigins: [
     'https://a7221111-1916-43b2-b248-ee0da20ef3c6-00-1t0jzdjxe7bfb.worf.replit.dev',
+    'https://a7221111-1916-43b2-b248-ee0da20ef3c6-00-1t0jzdjxe7bfb.worf.replit.dev:3001',
+    'http://a7221111-1916-43b2-b248-ee0da20ef3c6-00-1t0jzdjxe7bfb.worf.replit.dev',
+    'http://a7221111-1916-43b2-b248-ee0da20ef3c6-00-1t0jzdjxe7bfb.worf.replit.dev:3001',
     'http://127.0.0.1',
+    'http://127.0.0.1:3001',
   ],
   webpack: (config, { isServer }) => {
     config.resolve.alias = {
