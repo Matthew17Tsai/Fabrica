@@ -7,6 +7,15 @@ import { extractGarmentParamsFromImage } from '@/lib/ai/openaiVision';
 import { generateFlatSvg } from '@/lib/parametric/generateFlatSvg';
 import { VisionParsingError } from '@/lib/ai/types';
 import type { GarmentCategory, GarmentParamsResult } from '@/lib/ai/types';
+import {
+  getProject,
+  updateJob,
+  updateProjectStatus,
+  createAsset,
+  type Job,
+  type Project,
+} from '@/lib/db';
+import { nanoid } from 'nanoid';
 import fs from 'fs';
 
 // ── Input type detection ──────────────────────────────────────────
@@ -107,10 +116,12 @@ export async function processJob(job: Job): Promise<void> {
       const mimeType = project?.mime_type as string | undefined;
       const processingPath = detectProcessingPath(originalPath, mimeType);
 
-      // Store which path we chose on the project (for UI)
-      updateProjectMeta?.(project_id, {
+      // Store which path we chose (as JSON metadata file)
+      storageWriteFile(project_id, 'processing_meta.json', JSON.stringify({
         processing_path: processingPath,
-      });
+        vision_confidence: 0,
+        template_mode: false,
+      }));
 
       if (processingPath === 'photo') {
         // ── PHOTO PIPELINE (runs entirely in this one step) ────
@@ -130,11 +141,11 @@ export async function processJob(job: Job): Promise<void> {
         });
 
         // Store confidence + path for status API
-        updateProjectMeta?.(project_id, {
+        storageWriteFile(project_id, 'processing_meta.json', JSON.stringify({
           processing_path: 'photo',
           vision_confidence: confidence,
           template_mode: confidence < LOW_CONFIDENCE_THRESHOLD,
-        });
+        }));
 
         updateJob(job.id, { progress: 100, status: 'done' });
         updateProjectStatus(project_id, 'ready');
@@ -148,11 +159,11 @@ export async function processJob(job: Job): Promise<void> {
       // ── SKETCH PIPELINE (Path A) continues as before ─────────
       console.log(`[processor] Project ${project_id}: using SKETCH pipeline`);
 
-      updateProjectMeta?.(project_id, {
+      storageWriteFile(project_id, 'processing_meta.json', JSON.stringify({
         processing_path: 'sketch',
         vision_confidence: 1,
         template_mode: false,
-      });
+      }));
 
       const preprocessedPath = getFilePath(project_id, FILES.PREPROCESSED);
       await preprocessImage(originalPath, preprocessedPath);
