@@ -28,6 +28,10 @@ export async function GET(
         svg: !!svgAsset,
         techpack_json: !!techpackAsset,
       },
+      // New fields for vision integration
+      processingPath: (project as any).processing_path ?? 'sketch',
+      visionConfidence: (project as any).vision_confidence ?? 1,
+      templateMode: (project as any).template_mode ?? false,
     });
   } catch (error) {
     console.error('Status error:', error);
