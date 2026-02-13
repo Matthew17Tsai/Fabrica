@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <!-- Hoodie template: groups will be scaled by parametric engine -->
+  <g id="Hood">
+    <path d="M 135 120 Q 125 60 200 50 Q 275 60 265 120" fill="none" stroke="#1a1a1a" stroke-width="1.6" />
+  </g>
+  <g id="Body">
+    <path d="M 130 120 L 120 140 L 120 380 L 280 380 L 280 140 L 270 120 Z" fill="none" stroke="#1a1a1a" stroke-width="1.6" />
+  </g>
+  <g id="Sleeves">
+    <path d="M 120 130 L 40 220 L 75 240 L 120 175" fill="none" stroke="#1a1a1a" stroke-width="1.6" />
+    <path d="M 280 130 L 360 220 L 325 240 L 280 175" fill="none" stroke="#1a1a1a" stroke-width="1.6" />
+  </g>
+  <g id="Pocket">
+    <rect x="155" y="270" width="90" height="45" rx="4" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-dasharray="4 3" />
+  </g>
+  <g id="Outline"></g>
+  <g id="Details"></g>
+  <g id="Callouts"></g>
+</svg>
