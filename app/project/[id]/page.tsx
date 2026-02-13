@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ProcessingStatus } from '@/components/ProcessingStatus';
 
 interface ProjectStatus {
   project: {
@@ -22,6 +23,9 @@ interface ProjectStatus {
     svg: boolean;
     techpack_json: boolean;
   };
+  processingPath: 'photo' | 'sketch';
+  visionConfidence: number;
+  templateMode: boolean;
 }
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
@@ -77,11 +81,16 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
     );
   }
 
-  const { project, job, hasAssets } = status;
+  const { project, job, hasAssets, processingPath, visionConfidence, templateMode } = status;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-16">
-      <h1 className="text-4xl font-bold mb-2">{project.title}</h1>
+      <div className="flex items-center gap-3 mb-2">
+        <h1 className="text-4xl font-bold">{project.title}</h1>
+        {(project.status === 'processing' || project.status === 'ready') && (
+          <ProcessingStatus path={processingPath} confidence={visionConfidence} />
+        )}
+      </div>
       <p className="text-gray-600 mb-8 capitalize">{project.category}</p>
 
       {/* Status Display */}
@@ -112,8 +121,16 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         )}
 
         {project.status === 'ready' && (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-            ✓ Processing complete!
+          <div>
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+              Processing complete!
+            </div>
+            {templateMode && (
+              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+                Low confidence detection. The flat sketch was generated from a default template.
+                You can adjust proportions and features in the editor.
+              </div>
+            )}
           </div>
         )}
 
