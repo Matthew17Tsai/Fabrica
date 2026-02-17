@@ -6,7 +6,7 @@ import { ensureProjectDir, writeFile, FILES } from '@/lib/storage';
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    
+
     const title = formData.get('title') as string;
     const category = formData.get('category') as string;
     const file = formData.get('file') as File;
@@ -49,8 +49,13 @@ export async function POST(request: NextRequest) {
       path: FILES.ORIGINAL,
     });
 
-    // Create pipeline jobs (will be processed in sequence)
-    const jobSteps = ['preprocess', 'lineart', 'vectorize', 'normalize'];
+    // Detect if photo (JPEG or large file) to determine job steps
+    const isPhoto = file.type === 'image/jpeg' || file.type === 'image/heic' || buffer.length > 100_000;
+
+    const jobSteps = isPhoto
+      ? ['preprocess']
+      : ['preprocess', 'lineart', 'vectorize', 'normalize'];
+
     for (const step of jobSteps) {
       createJob({
         id: nanoid(),
@@ -60,7 +65,7 @@ export async function POST(request: NextRequest) {
         progress: 0,
       });
     }
-    
+
     // Update project status to processing
     updateProjectStatus(projectId, 'processing');
 

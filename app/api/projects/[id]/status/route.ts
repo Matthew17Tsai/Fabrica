@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProject, getJobsByProject, getAssetByType } from '@/lib/db';
+import { fileExists, readFile } from '@/lib/storage';
 
 export async function GET(
   request: NextRequest,
@@ -21,6 +22,20 @@ export async function GET(
     const svgAsset = getAssetByType(params.id, 'svg');
     const techpackAsset = getAssetByType(params.id, 'techpack_json');
 
+    // Read processing metadata from file
+    let processingPath = 'sketch';
+    let visionConfidence = 1;
+    let templateMode = false;
+
+    if (fileExists(params.id, 'processing_meta.json')) {
+      try {
+        const meta = JSON.parse(readFile(params.id, 'processing_meta.json').toString());
+        processingPath = meta.processing_path ?? 'sketch';
+        visionConfidence = meta.vision_confidence ?? 1;
+        templateMode = meta.template_mode ?? false;
+      } catch {}
+    }
+
     return NextResponse.json({
       project,
       job: currentJob,
@@ -28,6 +43,9 @@ export async function GET(
         svg: !!svgAsset,
         techpack_json: !!techpackAsset,
       },
+      processingPath,
+      visionConfidence,
+      templateMode,
     });
   } catch (error) {
     console.error('Status error:', error);
