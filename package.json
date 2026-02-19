@@ -12,10 +12,9 @@
     "generate:samples": "node scripts/generate-samples.js"
   },
   "dependencies": {
-    "@next/swc-linux-x64-gnu": "^16.1.6",
     "@types/better-sqlite3": "^7.6.0",
     "@types/papaparse": "^5.3.0",
-    "better-sqlite3": "^9.0.0",
+    "better-sqlite3": "^12.6.2",
     "exceljs": "^4.4.0",
     "konva": "^9.0.0",
     "nanoid": "^5.0.0",

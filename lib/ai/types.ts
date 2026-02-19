@@ -57,3 +57,57 @@ export interface ProcessingResult {
   confidence: number;
   params?: GarmentParamsResult;
 }
+
+// ── Expanded Analysis Types (Phase 2) ─────────────────────────────────────────
+
+export type FitType = "oversized" | "regular" | "slim";
+
+export type SubType =
+  | "oversized_hoodie"
+  | "pullover_hoodie"
+  | "zip_hoodie"
+  | "unisex_hoodie"
+  | "crewneck"
+  | "sweatpants";
+
+export interface MaterialInfo {
+  primary: string;            // e.g., "French Terry"
+  weight_estimate: string;    // e.g., "280 GSM"
+  composition_guess: string;  // e.g., "80% Cotton / 20% Polyester"
+}
+
+export interface ColorInfo {
+  primary_hex: string;    // e.g., "#4B5D52"
+  primary_name: string;   // e.g., "Forest Green"
+  accent_hex?: string;
+}
+
+export interface ConstructionDetails {
+  shoulder_type: "drop" | "set-in" | "raglan";
+  sleeve_style: "regular" | "balloon" | "tapered";
+  seam_type: "flatlock" | "overlock" | "coverstitch";
+  hem_style: "rib" | "raw" | "folded" | "elastic";
+  cuff_style: "rib" | "raw" | "elastic" | "open";
+}
+
+export interface BrandingInfo {
+  position: string;     // e.g., "left chest"
+  type: string;         // e.g., "embroidered logo"
+  description: string;
+}
+
+export interface ExpandedAnalysis {
+  // Shared with GarmentParamsResult
+  category: GarmentCategory;
+  params: GarmentParams;
+  features: GarmentFeatures;
+  confidence: number;
+
+  // Extended fields
+  sub_type: SubType;
+  fit: FitType;
+  material: MaterialInfo;
+  color: ColorInfo;
+  construction: ConstructionDetails;
+  branding?: BrandingInfo;
+}

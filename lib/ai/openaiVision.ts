@@ -12,7 +12,10 @@ import {
 const MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini";
 const MAX_RETRIES = 2;
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazy client — avoids module-level throw when OPENAI_API_KEY is not yet set
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 // ── System prompt ─────────────────────────────────────────────────
 
@@ -129,7 +132,7 @@ export async function extractGarmentParamsFromImage({
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: MODEL,
         max_tokens: 800,
         temperature: 0,

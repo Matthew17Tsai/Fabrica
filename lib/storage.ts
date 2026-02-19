@@ -40,11 +40,17 @@ export function deleteProjectFiles(projectId: string): void {
 
 // Standard filenames
 export const FILES = {
-  ORIGINAL: 'original.png',
-  PREPROCESSED: 'preprocessed.png',
-  LINEART: 'lineart.png',
-  SVG: 'flatsketch.svg',
-  TECHPACK_JSON: 'techpack.json',
-  TECHPACK_PDF: 'techpack.pdf',
-  TECHPACK_XLSX: 'techpack.xlsx',
+  ORIGINAL:       'original.png',
+  PREPROCESSED:   'preprocessed.png',
+  LINEART:        'lineart.png',
+  SVG:            'flatsketch.svg',          // legacy / single-view SVG
+  // Phase 3 — Recraft-generated flat sketches (front + back)
+  FLAT_SVG_FRONT: 'flatsketch_front.svg',
+  FLAT_SVG_BACK:  'flatsketch_back.svg',
+  FLAT_PNG_FRONT: 'flatsketch_front.png',
+  FLAT_PNG_BACK:  'flatsketch_back.png',
+  // Tech pack exports
+  TECHPACK_JSON:  'techpack.json',
+  TECHPACK_PDF:   'techpack.pdf',
+  TECHPACK_XLSX:  'techpack.xlsx',
 } as const;
