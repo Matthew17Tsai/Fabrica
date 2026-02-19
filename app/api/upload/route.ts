@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Detect if photo (JPEG or large file) to determine job steps
-    const isPhoto = file.type === 'image/jpeg' || file.type === 'image/heic' || buffer.length > 100_000;
+    const isPhoto = file.type !== 'image/svg+xml';
 
     const jobSteps = isPhoto
       ? ['preprocess']

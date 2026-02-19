@@ -17,6 +17,7 @@ import {
   updateJob,
   updateProjectStatus,
   createAsset,
+  getJobsByProject,
   type Job,
 } from "@/lib/db";
 import { nanoid } from "nanoid";
@@ -28,12 +29,7 @@ function detectProcessingPath(
   mimeType?: string,
 ): "photo" | "sketch" {
   if (mimeType === "image/svg+xml") return "sketch";
-  if (mimeType === "image/jpeg" || mimeType === "image/heic") return "photo";
-  try {
-    const stats = fs.statSync(originalPath);
-    if (stats.size > 100_000) return "photo";
-  } catch {}
-  return "sketch";
+  return "photo";
 }
 
 // ── Photo pipeline (Path B) ───────────────────────────────────────
@@ -113,7 +109,6 @@ export async function processJob(job: Job): Promise<void> {
       const mimeType = (project as any)?.mime_type as string | undefined;
       const processingPath = detectProcessingPath(originalPath, mimeType);
 
-      // Store which path we chose (as JSON metadata file)
       storageWriteFile(
         project_id,
         "processing_meta.json",
@@ -133,12 +128,7 @@ export async function processJob(job: Job): Promise<void> {
           (p) => updateJob(job.id, { progress: p }),
         );
 
-        createAsset({
-          id: nanoid(),
-          project_id,
-          type: "svg",
-          path: FILES.SVG,
-        });
+        createAsset({ id: nanoid(), project_id, type: "svg", path: FILES.SVG });
 
         storageWriteFile(
           project_id,
@@ -152,13 +142,13 @@ export async function processJob(job: Job): Promise<void> {
 
         updateJob(job.id, { progress: 100, status: "done" });
         updateProjectStatus(project_id, "ready");
-
         console.log(
           `✓ Project ${project_id} photo pipeline complete (confidence: ${confidence.toFixed(2)})`,
         );
         return;
       }
 
+      // ── SKETCH pipeline ──
       console.log(`[processor] Project ${project_id}: using SKETCH pipeline`);
 
       storageWriteFile(
@@ -180,6 +170,38 @@ export async function processJob(job: Job): Promise<void> {
         type: "preprocessed",
         path: FILES.PREPROCESSED,
       });
+
+      // Check if remaining steps exist as separate jobs
+      const allJobs = getJobsByProject(project_id);
+      const hasLineartJob = allJobs.some((j) => j.step === "lineart");
+
+      if (!hasLineartJob) {
+        // Run full sketch pipeline in this single step
+        const lineartPath = getFilePath(project_id, FILES.LINEART);
+        await generateLineArt(preprocessedPath, lineartPath);
+        createAsset({
+          id: nanoid(),
+          project_id,
+          type: "lineart",
+          path: FILES.LINEART,
+        });
+        updateJob(job.id, { progress: 50 });
+
+        const svgRawPath = getFilePath(project_id, "raw.svg");
+        await vectorizeToSVG(lineartPath, svgRawPath);
+        updateJob(job.id, { progress: 75 });
+
+        const svgPath = getFilePath(project_id, FILES.SVG);
+        normalizeSVG(svgRawPath, svgPath);
+        createAsset({ id: nanoid(), project_id, type: "svg", path: FILES.SVG });
+
+        updateJob(job.id, { progress: 100, status: "done" });
+        updateProjectStatus(project_id, "ready");
+        console.log(
+          `✓ Project ${project_id} sketch pipeline complete (single-step)!`,
+        );
+        return;
+      }
 
       updateJob(job.id, { progress: 25, status: "done" });
       return;
