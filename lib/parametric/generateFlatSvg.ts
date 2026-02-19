@@ -1,10 +1,4 @@
-import { readFile } from "fs/promises";
-import path from "path";
-import type {
-  GarmentCategory,
-  GarmentParams,
-  GarmentFeatures,
-} from "../ai/types";
+import type { GarmentCategory, GarmentParams, GarmentFeatures } from "../ai/types";
 
 // ── Defaults per category ─────────────────────────────────────────
 
@@ -39,13 +33,7 @@ const DEFAULTS: Record<GarmentCategory, GarmentParams> = {
 };
 
 const DEFAULT_FEATURES: Record<GarmentCategory, GarmentFeatures> = {
-  hoodie: {
-    zip: false,
-    kangarooPocket: true,
-    drawcord: true,
-    ribHem: true,
-    ribCuff: true,
-  },
+  hoodie: { zip: false, kangarooPocket: true, drawcord: true, ribHem: true, ribCuff: true },
   sweatshirt: { zip: false, drawcord: false, ribHem: true, ribCuff: true },
   sweatpants: { drawcord: true },
 };
@@ -79,20 +67,8 @@ function mx(x: number): number {
   return W - x;
 }
 
-async function loadTemplate(category: GarmentCategory): Promise<string | null> {
-  try {
-    const p = path.join(
-      process.cwd(),
-      "public",
-      "templates",
-      "flats",
-      `${category}.svg`,
-    );
-    return await readFile(p, "utf-8");
-  } catch {
-    return null;
-  }
-}
+// Template loading removed — always use procedural generator
+// to ensure vision params produce unique sketches per photo.
 
 // ── Professional Hoodie Generator ─────────────────────────────────
 
@@ -138,10 +114,8 @@ function generateHoodieSvg(p: GarmentParams, f: GarmentFeatures): string {
   const slvBotL_y = armholeBotY + 4;
   const slvTopEnd_x = slvTopL_x - sleeveDx;
   const slvTopEnd_y = slvTopL_y + sleeveDy;
-  const slvBotEnd_x =
-    slvBotL_x - sleeveDx + sleeveWrist * Math.sin(sleeveAngle) * 0.3;
-  const slvBotEnd_y =
-    slvBotL_y + sleeveDy - sleeveWrist * Math.cos(sleeveAngle) * 0.1;
+  const slvBotEnd_x = slvBotL_x - sleeveDx + sleeveWrist * Math.sin(sleeveAngle) * 0.3;
+  const slvBotEnd_y = slvBotL_y + sleeveDy - sleeveWrist * Math.cos(sleeveAngle) * 0.1;
 
   const body = [
     `M ${r(neckL)} ${r(neckY)}`,
@@ -195,15 +169,11 @@ function generateHoodieSvg(p: GarmentParams, f: GarmentFeatures): string {
 
   details.push(
     `<line x1="${r(neckL)}" y1="${r(neckY)}" x2="${r(sL)}" y2="${r(shoulderY)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
-    `<line x1="${r(neckR)}" y1="${r(neckY)}" x2="${r(sR)}" y2="${r(shoulderY)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
+    `<line x1="${r(neckR)}" y1="${r(neckY)}" x2="${r(sR)}" y2="${r(shoulderY)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`
   );
 
   if (f.kangarooPocket) {
-    const pocketY = lerp(
-      bodyBot - bodyH * 0.42,
-      bodyBot - bodyH * 0.22,
-      p.pocketTopY ?? 0.6,
-    );
+    const pocketY = lerp(bodyBot - bodyH * 0.42, bodyBot - bodyH * 0.22, p.pocketTopY ?? 0.6);
     const pocketW = bodyW * 0.56;
     const pocketH = bodyH * 0.14;
     const pL = CX - pocketW / 2;
@@ -228,7 +198,7 @@ function generateHoodieSvg(p: GarmentParams, f: GarmentFeatures): string {
 
     details.push(
       `<path d="${pocket}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
-      `<path d="${pocketTop}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
+      `<path d="${pocketTop}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`
     );
 
     const pocketStitch = [
@@ -240,21 +210,21 @@ function generateHoodieSvg(p: GarmentParams, f: GarmentFeatures): string {
       `L ${r(pR - 3)} ${r(pocketY + pocketH * 0.45)}`,
     ].join(" ");
     details.push(
-      `<path d="${pocketStitch}" fill="none" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
+      `<path d="${pocketStitch}" fill="none" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`
     );
   }
 
   if (f.zip) {
     details.push(
-      `<line x1="${r(CX)}" y1="${r(neckY + neckDrop)}" x2="${r(CX)}" y2="${r(bodyBot - ribH)}" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
+      `<line x1="${r(CX)}" y1="${r(neckY + neckDrop)}" x2="${r(CX)}" y2="${r(bodyBot - ribH)}" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`
     );
     for (let y = neckY + neckDrop + 15; y < bodyBot - ribH - 10; y += 8) {
       details.push(
-        `<line x1="${r(CX - 1.5)}" y1="${r(y)}" x2="${r(CX + 1.5)}" y2="${r(y)}" stroke="${DETAIL.color}" stroke-width="0.6" />`,
+        `<line x1="${r(CX - 1.5)}" y1="${r(y)}" x2="${r(CX + 1.5)}" y2="${r(y)}" stroke="${DETAIL.color}" stroke-width="0.6" />`
       );
     }
     details.push(
-      `<rect x="${r(CX - 3)}" y="${r(neckY + neckDrop + 4)}" width="6" height="10" rx="1.5" fill="none" stroke="${DETAIL.color}" stroke-width="0.8" />`,
+      `<rect x="${r(CX - 3)}" y="${r(neckY + neckDrop + 4)}" width="6" height="10" rx="1.5" fill="none" stroke="${DETAIL.color}" stroke-width="0.8" />`
     );
   }
 
@@ -267,43 +237,40 @@ function generateHoodieSvg(p: GarmentParams, f: GarmentFeatures): string {
       `<line x1="${r(CX - 7)}" y1="${r(dcY + cordLen)}" x2="${r(CX - 6.5)}" y2="${r(dcY + cordLen + 5)}" stroke="${DETAIL.color}" stroke-width="1.4" stroke-linecap="round" />`,
       `<line x1="${r(CX + 7)}" y1="${r(dcY + cordLen)}" x2="${r(CX + 6.5)}" y2="${r(dcY + cordLen + 5)}" stroke="${DETAIL.color}" stroke-width="1.4" stroke-linecap="round" />`,
       `<circle cx="${r(CX - 5)}" cy="${r(dcY)}" r="1.5" fill="none" stroke="${DETAIL.color}" stroke-width="0.6" />`,
-      `<circle cx="${r(CX + 5)}" cy="${r(dcY)}" r="1.5" fill="none" stroke="${DETAIL.color}" stroke-width="0.6" />`,
+      `<circle cx="${r(CX + 5)}" cy="${r(dcY)}" r="1.5" fill="none" stroke="${DETAIL.color}" stroke-width="0.6" />`
     );
   }
 
   if (f.ribHem) {
     details.push(
-      `<rect x="${r(bL)}" y="${r(bodyBot - ribH)}" width="${r(bodyW)}" height="${r(ribH)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
+      `<rect x="${r(bL)}" y="${r(bodyBot - ribH)}" width="${r(bodyW)}" height="${r(ribH)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`
     );
     for (let i = 1; i <= 3; i++) {
       const lineY = bodyBot - ribH + (ribH * i) / 4;
       details.push(
-        `<line x1="${r(bL + 2)}" y1="${r(lineY)}" x2="${r(bR - 2)}" y2="${r(lineY)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" />`,
+        `<line x1="${r(bL + 2)}" y1="${r(lineY)}" x2="${r(bR - 2)}" y2="${r(lineY)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" />`
       );
     }
   }
 
   if (f.ribCuff) {
-    const cuffAngle = Math.atan2(
-      slvBotEnd_y - slvTopEnd_y,
-      slvBotEnd_x - slvTopEnd_x,
-    );
+    const cuffAngle = Math.atan2(slvBotEnd_y - slvTopEnd_y, slvBotEnd_x - slvTopEnd_x);
     const cuffDx = cuffH * Math.cos(cuffAngle + Math.PI / 2);
     const cuffDy = cuffH * Math.sin(cuffAngle + Math.PI / 2);
     details.push(
       `<path d="M ${r(slvTopEnd_x)} ${r(slvTopEnd_y)} L ${r(slvTopEnd_x - cuffDx)} ${r(slvTopEnd_y - cuffDy)} L ${r(slvBotEnd_x - cuffDx)} ${r(slvBotEnd_y - cuffDy)} L ${r(slvBotEnd_x)} ${r(slvBotEnd_y)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
-      `<path d="M ${r(mx(slvTopEnd_x))} ${r(slvTopEnd_y)} L ${r(mx(slvTopEnd_x - cuffDx))} ${r(slvTopEnd_y - cuffDy)} L ${r(mx(slvBotEnd_x - cuffDx))} ${r(slvBotEnd_y - cuffDy)} L ${r(mx(slvBotEnd_x))} ${r(slvBotEnd_y)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
+      `<path d="M ${r(mx(slvTopEnd_x))} ${r(slvTopEnd_y)} L ${r(mx(slvTopEnd_x - cuffDx))} ${r(slvTopEnd_y - cuffDy)} L ${r(mx(slvBotEnd_x - cuffDx))} ${r(slvBotEnd_y - cuffDy)} L ${r(mx(slvBotEnd_x))} ${r(slvBotEnd_y)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`
     );
   }
 
   details.push(
     `<line x1="${r(bL)}" y1="${r(armholeBotY + 5)}" x2="${r(bL)}" y2="${r(bodyBot - ribH)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
-    `<line x1="${r(bR)}" y1="${r(armholeBotY + 5)}" x2="${r(bR)}" y2="${r(bodyBot - ribH)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
+    `<line x1="${r(bR)}" y1="${r(armholeBotY + 5)}" x2="${r(bR)}" y2="${r(bodyBot - ribH)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`
   );
 
   if (!f.zip) {
     details.push(
-      `<line x1="${r(CX)}" y1="${r(neckY + neckDrop + 25)}" x2="${r(CX)}" y2="${r(bodyBot - ribH - 5)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" stroke-dasharray="8 6" />`,
+      `<line x1="${r(CX)}" y1="${r(neckY + neckDrop + 25)}" x2="${r(CX)}" y2="${r(bodyBot - ribH - 5)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" stroke-dasharray="8 6" />`
     );
   }
 
@@ -368,10 +335,8 @@ function generateSweatshirtSvg(p: GarmentParams, f: GarmentFeatures): string {
   const slvBotL_y = armholeBotY + 4;
   const slvTopEnd_x = slvTopL_x - sleeveDx;
   const slvTopEnd_y = slvTopL_y + sleeveDy;
-  const slvBotEnd_x =
-    slvBotL_x - sleeveDx + sleeveWrist * Math.sin(sleeveAngle) * 0.3;
-  const slvBotEnd_y =
-    slvBotL_y + sleeveDy - sleeveWrist * Math.cos(sleeveAngle) * 0.1;
+  const slvBotEnd_x = slvBotL_x - sleeveDx + sleeveWrist * Math.sin(sleeveAngle) * 0.3;
+  const slvBotEnd_y = slvBotL_y + sleeveDy - sleeveWrist * Math.cos(sleeveAngle) * 0.1;
 
   const neckOuter = [
     `M ${r(neckL)} ${r(neckY)}`,
@@ -414,37 +379,32 @@ function generateSweatshirtSvg(p: GarmentParams, f: GarmentFeatures): string {
 
   details.push(
     `<line x1="${r(neckL)}" y1="${r(neckY)}" x2="${r(sL)}" y2="${r(shoulderY)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
-    `<line x1="${r(neckR)}" y1="${r(neckY)}" x2="${r(sR)}" y2="${r(shoulderY)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
+    `<line x1="${r(neckR)}" y1="${r(neckY)}" x2="${r(sR)}" y2="${r(shoulderY)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`
   );
 
   if (f.ribHem) {
     details.push(
-      `<rect x="${r(bL)}" y="${r(bodyBot - ribH)}" width="${r(bodyW)}" height="${r(ribH)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
+      `<rect x="${r(bL)}" y="${r(bodyBot - ribH)}" width="${r(bodyW)}" height="${r(ribH)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`
     );
     for (let i = 1; i <= 3; i++) {
-      details.push(
-        `<line x1="${r(bL + 2)}" y1="${r(bodyBot - ribH + (ribH * i) / 4)}" x2="${r(bR - 2)}" y2="${r(bodyBot - ribH + (ribH * i) / 4)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" />`,
-      );
+      details.push(`<line x1="${r(bL + 2)}" y1="${r(bodyBot - ribH + (ribH * i) / 4)}" x2="${r(bR - 2)}" y2="${r(bodyBot - ribH + (ribH * i) / 4)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" />`);
     }
   }
 
   if (f.ribCuff) {
-    const cuffAngle = Math.atan2(
-      slvBotEnd_y - slvTopEnd_y,
-      slvBotEnd_x - slvTopEnd_x,
-    );
+    const cuffAngle = Math.atan2(slvBotEnd_y - slvTopEnd_y, slvBotEnd_x - slvTopEnd_x);
     const cuffH = 14;
     const cuffDx = cuffH * Math.cos(cuffAngle + Math.PI / 2);
     const cuffDy = cuffH * Math.sin(cuffAngle + Math.PI / 2);
     details.push(
       `<path d="M ${r(slvTopEnd_x)} ${r(slvTopEnd_y)} L ${r(slvTopEnd_x - cuffDx)} ${r(slvTopEnd_y - cuffDy)} L ${r(slvBotEnd_x - cuffDx)} ${r(slvBotEnd_y - cuffDy)} L ${r(slvBotEnd_x)} ${r(slvBotEnd_y)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
-      `<path d="M ${r(mx(slvTopEnd_x))} ${r(slvTopEnd_y)} L ${r(mx(slvTopEnd_x - cuffDx))} ${r(slvTopEnd_y - cuffDy)} L ${r(mx(slvBotEnd_x - cuffDx))} ${r(slvBotEnd_y - cuffDy)} L ${r(mx(slvBotEnd_x))} ${r(slvBotEnd_y)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`,
+      `<path d="M ${r(mx(slvTopEnd_x))} ${r(slvTopEnd_y)} L ${r(mx(slvTopEnd_x - cuffDx))} ${r(slvTopEnd_y - cuffDy)} L ${r(mx(slvBotEnd_x - cuffDx))} ${r(slvBotEnd_y - cuffDy)} L ${r(mx(slvBotEnd_x))} ${r(slvBotEnd_y)}" fill="none" stroke="${DETAIL.color}" stroke-width="${DETAIL.width}" />`
     );
   }
 
   details.push(
     `<line x1="${r(bL)}" y1="${r(armholeBotY + 5)}" x2="${r(bL)}" y2="${r(bodyBot - ribH)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
-    `<line x1="${r(bR)}" y1="${r(armholeBotY + 5)}" x2="${r(bR)}" y2="${r(bodyBot - ribH)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
+    `<line x1="${r(bR)}" y1="${r(armholeBotY + 5)}" x2="${r(bR)}" y2="${r(bodyBot - ribH)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`
   );
 
   return buildSvg([
@@ -519,7 +479,7 @@ function generateSweatpantsSvg(p: GarmentParams, f: GarmentFeatures): string {
 
   details.push(
     `<line x1="${r(wL + 2)}" y1="${r(top + waistbandH * 0.4)}" x2="${r(wR - 2)}" y2="${r(top + waistbandH * 0.4)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" />`,
-    `<line x1="${r(wL + 2)}" y1="${r(top + waistbandH * 0.7)}" x2="${r(wR - 2)}" y2="${r(top + waistbandH * 0.7)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" />`,
+    `<line x1="${r(wL + 2)}" y1="${r(top + waistbandH * 0.7)}" x2="${r(wR - 2)}" y2="${r(top + waistbandH * 0.7)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" />`
   );
 
   if (f.drawcord) {
@@ -528,14 +488,14 @@ function generateSweatpantsSvg(p: GarmentParams, f: GarmentFeatures): string {
       `<path d="M ${r(CX - 4)} ${r(dcY)} C ${r(CX - 6)} ${r(dcY + 8)} ${r(CX - 8)} ${r(dcY + 16)} ${r(CX - 6)} ${r(dcY + 22)}" fill="none" stroke="${DETAIL.color}" stroke-width="0.8" />`,
       `<path d="M ${r(CX + 4)} ${r(dcY)} C ${r(CX + 6)} ${r(dcY + 8)} ${r(CX + 8)} ${r(dcY + 16)} ${r(CX + 6)} ${r(dcY + 22)}" fill="none" stroke="${DETAIL.color}" stroke-width="0.8" />`,
       `<line x1="${r(CX - 6)}" y1="${r(dcY + 22)}" x2="${r(CX - 5.5)}" y2="${r(dcY + 27)}" stroke="${DETAIL.color}" stroke-width="1.4" stroke-linecap="round" />`,
-      `<line x1="${r(CX + 6)}" y1="${r(dcY + 22)}" x2="${r(CX + 5.5)}" y2="${r(dcY + 27)}" stroke="${DETAIL.color}" stroke-width="1.4" stroke-linecap="round" />`,
+      `<line x1="${r(CX + 6)}" y1="${r(dcY + 22)}" x2="${r(CX + 5.5)}" y2="${r(dcY + 27)}" stroke="${DETAIL.color}" stroke-width="1.4" stroke-linecap="round" />`
     );
   }
 
   details.push(
     `<line x1="${r(llOuterBot_x)}" y1="${r(kneeY + 10)}" x2="${r(llOuterBot_x)}" y2="${r(bot)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
     `<line x1="${r(rlOuterBot_x)}" y1="${r(kneeY + 10)}" x2="${r(rlOuterBot_x)}" y2="${r(bot)}" stroke="${STITCH.color}" stroke-width="${STITCH.width}" stroke-dasharray="${STITCH_DASH}" />`,
-    `<line x1="${r(CX)}" y1="${r(top + waistbandH + 5)}" x2="${r(CX)}" y2="${r(crotchY - 5)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" stroke-dasharray="8 6" />`,
+    `<line x1="${r(CX)}" y1="${r(top + waistbandH + 5)}" x2="${r(CX)}" y2="${r(crotchY - 5)}" stroke="${CONSTRUCTION.color}" stroke-width="${CONSTRUCTION.width}" stroke-dasharray="8 6" />`
   );
 
   return buildSvg([
@@ -564,61 +524,17 @@ function buildSvg(inner: string[]): string {
   ].join("\n");
 }
 
-// ── Template-based transform ──────────────────────────────────────
-
-function applyParamsToTemplate(
-  templateSvg: string,
-  category: GarmentCategory,
-  params: GarmentParams,
-  _features: GarmentFeatures,
-): string {
-  const defaults = DEFAULTS[category];
-  const groupScales: Record<string, { sx: number; sy: number }> = {};
-
-  if (category === "hoodie" || category === "sweatshirt") {
-    groupScales["Body"] = {
-      sx: (params.bodyWidth || defaults.bodyWidth) / defaults.bodyWidth,
-      sy: (params.bodyLength || defaults.bodyLength) / defaults.bodyLength,
-    };
-    groupScales["Sleeves"] = {
-      sx:
-        (params.sleeveLength || defaults.sleeveLength) / defaults.sleeveLength,
-      sy: (params.sleeveWidth || defaults.sleeveWidth) / defaults.sleeveWidth,
-    };
-  }
-  if (category === "hoodie") {
-    groupScales["Hood"] = {
-      sx: (params.hoodWidth || defaults.hoodWidth!) / defaults.hoodWidth!,
-      sy: (params.hoodHeight || defaults.hoodHeight!) / defaults.hoodHeight!,
-    };
-  }
-
-  let svg = templateSvg;
-  for (const [groupId, { sx, sy }] of Object.entries(groupScales)) {
-    const regex = new RegExp(`(<g[^>]*id=["']${groupId}["'])`, "g");
-    svg = svg.replace(
-      regex,
-      `$1 transform="scale(${sx.toFixed(3)} ${sy.toFixed(3)})"`,
-    );
-  }
-
-  return svg;
-}
+// Template-based transform removed — procedural generation only.
 
 // ── Public API ────────────────────────────────────────────────────
 
 export async function generateFlatSvg(
   category: GarmentCategory,
   params?: GarmentParams,
-  features?: GarmentFeatures,
+  features?: GarmentFeatures
 ): Promise<string> {
   const p = { ...DEFAULTS[category], ...params };
   const f = { ...DEFAULT_FEATURES[category], ...features };
-
-  const template = await loadTemplate(category);
-  if (template) {
-    return applyParamsToTemplate(template, category, p, f);
-  }
 
   switch (category) {
     case "hoodie":
