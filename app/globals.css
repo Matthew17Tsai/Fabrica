@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS Custom Properties ──────────────────────────────────────────────────── */
+:root {
+  --color-bg:              #FAFAF9;
+  --color-surface:         #FFFFFF;
+  --color-border:          #E7E5E4;
+  --color-border-focus:    #D6D3D1;
+  --color-text:            #1C1917;
+  --color-text-secondary:  #78716C;
+  --color-text-tertiary:   #A8A29E;
+  --color-confirmed:       #16A34A;
+  --color-unconfirmed:     #D97706;
+  --color-not-started:     #A8A29E;
+  --color-error:           #DC2626;
+  --color-accent:          #1C1917;
+  --color-accent-hover:    #292524;
+  --color-accent-bg:       #F5F5F4;
+  --color-cost-bg:         #FEFCE8;
+}
+
+/* ── Base styles ─────────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
   padding: 0;
@@ -9,5 +29,64 @@
 }
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Cost pulse animation ─────────────────────────────────────────────────────
+   Applied to the landed cost number when it changes in the cost sidebar.    */
+@keyframes cost-pulse {
+  0%   { background-color: transparent; }
+  20%  { background-color: #FEF08A; }   /* yellow-200 */
+  100% { background-color: transparent; }
+}
+
+.cost-pulse {
+  animation: cost-pulse 0.6s ease-out;
+  border-radius: 4px;
+}
+
+/* ── Table base ──────────────────────────────────────────────────────────────── */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* ── Input base ──────────────────────────────────────────────────────────────── */
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  font-family: inherit;
+  font-size: 14px;
+}
+
+/* Editable cell cursor hint */
+.cell-editable {
+  cursor: text;
+}
+.cell-editable:hover {
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+}
+
+/* ── Status dot helpers ───────────────────────────────────────────────────────── */
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.confirmed    { background-color: var(--color-confirmed); }
+.status-dot.unconfirmed  { background-color: var(--color-unconfirmed); }
+.status-dot.not-started  {
+  background-color: transparent;
+  border: 1.5px solid var(--color-not-started);
 }

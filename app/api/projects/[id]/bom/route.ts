@@ -1,11 +1,29 @@
+/**
+ * BOM API routes — new schema with pricing
+ *
+ * GET    /api/projects/[id]/bom              — list items
+ * PUT    /api/projects/[id]/bom              — full replace
+ * POST   /api/projects/[id]/bom              — add single item
+ * PATCH  /api/projects/[id]/bom/[itemId]     — update single item (handled separately)
+ * DELETE /api/projects/[id]/bom/[itemId]     — remove item (handled separately)
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import { getProject, getBomItems, replaceBomItems, upsertBomItem, getConstructionNotes, replaceConstructionNotes } from '@/lib/db';
-import type { SubType } from '@/lib/db';
-import { getBomTemplate, getConstructionTemplate } from '@/lib/templates/bom';
+import {
+  getProject,
+  getBomItems,
+  replaceBomItems,
+  upsertBomItem,
+  getProjectCostSettings,
+} from '@/lib/db';
+import type { BomCategory } from '@/lib/db';
+import { computeCostBreakdown } from '@/lib/cost/calculator';
+import { getBomTemplateWithPricing } from '@/lib/templates/bom';
 
-// GET /api/projects/[id]/bom
-// Returns BOM items. If none exist yet, auto-seeds from template and returns those.
+export const runtime = 'nodejs';
+
+// GET — list BOM items with computed totals
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } },
@@ -17,34 +35,56 @@ export async function GET(
 
   let items = getBomItems(params.id);
 
-  // Auto-seed from template on first access
+  // Auto-seed if empty
   if (items.length === 0) {
-    const template = getBomTemplate(project.category, project.sub_type as SubType | undefined);
-    items = replaceBomItems(
-      params.id,
-      template.map((t, i) => ({ ...t, sort_order: i })),
-    );
-
-    // Also seed construction notes if empty
-    if (getConstructionNotes(params.id).length === 0) {
-      const noteTemplates = getConstructionTemplate(project.category);
-      replaceConstructionNotes(
-        params.id,
-        noteTemplates.map((n, i) => ({ ...n, sort_order: i })),
-      );
-    }
+    const template = getBomTemplateWithPricing(project.category, project.sub_type ?? undefined);
+    items = replaceBomItems(params.id, template);
   }
 
-  return NextResponse.json({ bom: items });
+  const settings  = getProjectCostSettings(params.id);
+  const breakdown = computeCostBreakdown(items, settings);
+
+  return NextResponse.json({ bom: items, costBreakdown: breakdown });
 }
 
-// PUT /api/projects/[id]/bom
-// Full replace of BOM items for the project.
-// Body: { items: Array<BomItemInput> }
-//
-// To add or update a single item, include all items in the array (it's a full replace).
-// To seed from template, POST to /api/projects/[id]/bom/prefill (not a separate route —
-// caller can GET first and the auto-seed logic handles it).
+// POST — add a single BOM item
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const project = getProject(params.id);
+  if (!project) {
+    return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+  }
+
+  const body = await req.json();
+  const allItems = getBomItems(params.id);
+
+  const item = upsertBomItem({
+    id:            nanoid(),
+    project_id:    params.id,
+    category:      (body.category    ?? 'trim') as BomCategory,
+    component:     String(body.component   ?? ''),
+    material:      String(body.material    ?? ''),
+    composition:   String(body.composition ?? ''),
+    specification: body.specification != null ? String(body.specification) : null,
+    notes:         body.notes         != null ? String(body.notes)         : null,
+    unit_price:    Number(body.unit_price   ?? 0),
+    unit:          String(body.unit         ?? 'piece'),
+    consumption:   Number(body.consumption  ?? 1),
+    wastage:       Number(body.wastage       ?? 0),
+    price_source:  'user_added',
+    sort_order:    allItems.length,
+  });
+
+  const updatedItems = getBomItems(params.id);
+  const settings     = getProjectCostSettings(params.id);
+  const breakdown    = computeCostBreakdown(updatedItems, settings);
+
+  return NextResponse.json({ item, costBreakdown: breakdown }, { status: 201 });
+}
+
+// PUT — full replace
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -54,39 +94,31 @@ export async function PUT(
     return NextResponse.json({ error: 'Project not found' }, { status: 404 });
   }
 
-  let body: { items?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
+  const body = await req.json() as { items?: unknown };
   if (!Array.isArray(body.items)) {
     return NextResponse.json({ error: '"items" must be an array' }, { status: 400 });
   }
 
-  type BomInput = {
-    component?: unknown;
-    material?: unknown;
-    composition?: unknown;
-    weight?: unknown;
-    supplier?: unknown;
-    color?: unknown;
-    notes?: unknown;
-    sort_order?: unknown;
-  };
+  type BomInput = Record<string, unknown>;
 
   const sanitized = (body.items as BomInput[]).map((item, i) => ({
-    component:   String(item.component   ?? ''),
-    material:    String(item.material    ?? ''),
-    composition: String(item.composition ?? ''),
-    weight:      String(item.weight      ?? ''),
-    supplier:    item.supplier != null ? String(item.supplier) : null,
-    color:       item.color    != null ? String(item.color)    : null,
-    notes:       item.notes    != null ? String(item.notes)    : null,
-    sort_order:  typeof item.sort_order === 'number' ? item.sort_order : i,
+    category:      (String(item.category    ?? 'fabric')) as BomCategory,
+    component:     String(item.component    ?? ''),
+    material:      String(item.material     ?? ''),
+    composition:   String(item.composition  ?? ''),
+    specification: item.specification != null ? String(item.specification) : null,
+    notes:         item.notes         != null ? String(item.notes)         : null,
+    unit_price:    Number(item.unit_price    ?? 0),
+    unit:          String(item.unit          ?? 'piece'),
+    consumption:   Number(item.consumption   ?? 1),
+    wastage:       Number(item.wastage        ?? 0),
+    price_source:  String(item.price_source  ?? 'user_edited'),
+    sort_order:    typeof item.sort_order === 'number' ? item.sort_order : i,
   }));
 
-  const items = replaceBomItems(params.id, sanitized);
-  return NextResponse.json({ bom: items });
+  const items     = replaceBomItems(params.id, sanitized);
+  const settings  = getProjectCostSettings(params.id);
+  const breakdown = computeCostBreakdown(items, settings);
+
+  return NextResponse.json({ bom: items, costBreakdown: breakdown });
 }

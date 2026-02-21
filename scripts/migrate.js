@@ -9,7 +9,7 @@ console.log('Running migrations...');
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+db.pragma('foreign_keys = OFF');  // temporarily off during drops
 
 // Create tracking table if it doesn't exist
 db.exec(`
@@ -43,5 +43,6 @@ for (const file of migrationFiles) {
   console.log(`  ✓ ${file}`);
 }
 
+db.pragma('foreign_keys = ON');
 db.close();
 console.log('Migrations complete!');

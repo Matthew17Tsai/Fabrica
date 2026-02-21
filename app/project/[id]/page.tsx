@@ -1,232 +1,480 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import OverviewTab      from '@/components/tabs/OverviewTab';
-import FlatSketchTab    from '@/components/tabs/FlatSketchTab';
-import MeasurementsTab  from '@/components/tabs/MeasurementsTab';
-import BomTab           from '@/components/tabs/BomTab';
-import ConstructionTab  from '@/components/tabs/ConstructionTab';
-import ExportTab        from '@/components/tabs/ExportTab';
+/**
+ * /project/[id] — two-column wizard layout.
+ *
+ * Steps: Features(1) → POM(2) → Size Run(3) → BOM(4) → Cost(5)
+ * Materials editing lives inside the BOM table (no separate Materials step).
+ *
+ * Left column: WizardNav + current step component + Back/Next buttons.
+ * Right column: CostSidebar (persistent, refreshes after each mutation).
+ */
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
-interface ProjectData {
-  id: string;
-  title: string;
-  category: string;
-  sub_type: string | null;
-  fit: string | null;
-  base_size: string | null;
-  status: string;
-  detected_color: string | null;
-  detected_material: string | null;
-  ai_analysis_json: string | null;
-  error_message: string | null;
+import WizardNav from '@/components/wizard/WizardNav';
+import CostSidebar from '@/components/CostSidebar';
+import type { CostSidebarHandle } from '@/components/CostSidebar';
+import Step1Features from '@/components/wizard/Step1Features';
+import Step3POM from '@/components/wizard/Step3POM';
+import Step4SizeRun from '@/components/wizard/Step4SizeRun';
+import Step5BOM from '@/components/wizard/Step5BOM';
+import Step5Cost from '@/components/wizard/Step5Cost';
+import type { ConfirmedFeatures } from '@/lib/cost/features';
+import type { SubType } from '@/lib/db';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type StepStatus = 'not_started' | 'unconfirmed' | 'confirmed';
+
+interface WizardStepStatuses {
+  features:  string;
+  materials: string;
+  pom:       string;
+  sizerun:   string;
+  bom:       string;
 }
 
 interface ProjectStatus {
-  project: ProjectData;
-  job: { status: string; step: string; progress: number; error_message: string | null } | null;
-  hasAssets: { svg: boolean; flat_front: boolean; flat_back: boolean; techpack_json: boolean };
+  project: {
+    id: string;
+    style_name: string;
+    style_number: string | null;
+    season: string | null;
+    category: string;
+    sub_type: string | null;
+    base_size: string;
+    fit: string | null;
+    status: string;
+    ai_analysis_json: string | null;
+    confirmed_features_json: string | null;
+    confirmed_materials_json: string | null;
+    moq_quantity: number;
+  };
+  hasAssets: {
+    photo_front:      boolean;
+    sketch_front:     boolean;
+    sketch_back:      boolean;
+    ai_sketch_front:  boolean;
+    ai_sketch_back:   boolean;
+  };
   measurementCount: number;
-  processingPath: string;
-  visionConfidence: number;
-  templateMode: boolean;
+  wizardStepStatuses: WizardStepStatuses;
 }
 
-type TabId = 'overview' | 'flat-sketch' | 'measurements' | 'bom' | 'construction' | 'export';
-
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview',      label: 'Overview'      },
-  { id: 'flat-sketch',   label: 'Flat Sketch'   },
-  { id: 'measurements',  label: 'Measurements'  },
-  { id: 'bom',           label: 'BOM'           },
-  { id: 'construction',  label: 'Construction'  },
-  { id: 'export',        label: 'Export'        },
-];
-
-const CATEGORY_LABELS: Record<string, string> = {
-  hoodie:     'Hoodie',
-  sweatshirt: 'Sweatshirt',
-  sweatpants: 'Sweatpants',
-};
-
-// ── Page ───────────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
-  const [status,  setStatus]  = useState<ProjectStatus | null>(null);
-  const [tab,     setTab]     = useState<TabId>('overview');
-  const [loadErr, setLoadErr] = useState('');
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+
+  const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null);
+  const [bomItems, setBomItems]           = useState<unknown[]>([]);
+  const [bomLoaded, setBomLoaded]         = useState(false);
+  const [measurements, setMeasurements]   = useState<unknown[]>([]);
+  const [sizeRun, setSizeRun]             = useState<unknown[]>([]);
+  const [loadErr, setLoadErr]             = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting]           = useState(false);
+
+  const sidebarRef = useRef<CostSidebarHandle>(null);
+
+  // Current step from URL (1-5), default to 1
+  const stepParam   = parseInt(searchParams.get('step') ?? '1', 10);
+  const currentStep = isNaN(stepParam) || stepParam < 1 || stepParam > 5 ? 1 : stepParam;
+
+  function goToStep(n: number) {
+    router.push(`/project/${params.id}?step=${n}`, { scroll: false });
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
 
   const fetchStatus = useCallback(async () => {
-    try {
-      const res  = await fetch(`/api/projects/${params.id}/status`);
+    const res = await fetch(`/api/projects/${params.id}/status`);
+    if (!res.ok) { setLoadErr('Project not found'); return; }
+    const data: ProjectStatus = await res.json();
+    setProjectStatus(data);
+  }, [params.id]);
+
+  const fetchBom = useCallback(async () => {
+    const res = await fetch(`/api/projects/${params.id}/bom`);
+    if (res.ok) {
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load project');
-      setStatus(data);
-    } catch (e) {
-      setLoadErr(e instanceof Error ? e.message : 'Failed to load project');
+      // BOM endpoint returns { bom: [...], costBreakdown: {...} }
+      setBomItems(data.bom ?? data.items ?? []);
+    }
+    setBomLoaded(true);
+  }, [params.id]);
+
+  const fetchMeasurements = useCallback(async () => {
+    const res = await fetch(`/api/projects/${params.id}/measurements`);
+    if (!res.ok) return;
+    const data = await res.json();
+    // Auto-seed from template on first load
+    if ((data.measurements ?? []).length === 0) {
+      const seedRes = await fetch(`/api/projects/${params.id}/measurements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replace: false }),
+      });
+      if (seedRes.ok) {
+        const seedData = await seedRes.json();
+        setMeasurements(seedData.measurements ?? []);
+        return;
+      }
+    }
+    setMeasurements(data.measurements ?? []);
+  }, [params.id]);
+
+  const fetchSizeRun = useCallback(async () => {
+    const res = await fetch(`/api/projects/${params.id}/sizerun`);
+    if (res.ok) {
+      const data = await res.json();
+      setSizeRun(data.sizeRun ?? []);
     }
   }, [params.id]);
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000);
-    return () => clearInterval(interval);
-  }, [fetchStatus]);
+    fetchBom();
+    fetchMeasurements();
+    fetchSizeRun();
+  }, [fetchStatus, fetchBom, fetchMeasurements, fetchSizeRun]);
 
-  // ── Loading / error states ──────────────────────────────────────────────────
+  function refreshAll() {
+    fetchStatus();
+    fetchBom();
+    sidebarRef.current?.refresh();
+  }
+
+  // ── Loading/error ─────────────────────────────────────────────────────────
 
   if (loadErr) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16">
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+      <div style={{ maxWidth: '480px', margin: '4rem auto', padding: '0 1.5rem' }}>
+        <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: 'var(--color-error)', fontSize: '0.875rem' }}>
           {loadErr}
         </div>
-        <Link href="/" className="mt-4 inline-block text-primary hover:underline text-sm">
-          ← Go home
-        </Link>
+        <a href="/" style={{ display: 'inline-block', marginTop: '1rem', fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
+          ← Back to projects
+        </a>
       </div>
     );
   }
 
-  if (!status) {
+  if (!projectStatus) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center text-gray-400 text-sm">
+      <div style={{ textAlign: 'center', padding: '4rem 1.5rem', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
         Loading…
       </div>
     );
   }
 
-  const { project, job, hasAssets, measurementCount } = status;
+  const { project, hasAssets, wizardStepStatuses } = projectStatus;
+  const stepStatuses = wizardStepStatuses;
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  const photoUrl  = hasAssets.photo_front  ? `/api/projects/${params.id}/original-image` : undefined;
+  // Prefer user-uploaded sketch; fall back to AI-generated sketch
+  const sketchUrl = hasAssets.sketch_front
+    ? `/api/projects/${params.id}/sketch-front`
+    : hasAssets.ai_sketch_front
+      ? `/api/projects/${params.id}/ai-sketch?view=front`
+      : undefined;
+
+  const confirmedFeatures = project.confirmed_features_json
+    ? (JSON.parse(project.confirmed_features_json) as ConfirmedFeatures)
+    : null;
+
+  const visibleGroups = confirmedFeatures
+    ? (() => {
+        const groups = ['body', 'sleeve'];
+        if (confirmedFeatures.hasHood)     groups.push('hood');
+        if (confirmedFeatures.hasPockets)  groups.push('pocket');
+        if (confirmedFeatures.hasZipper)   groups.push('zipper');
+        if (confirmedFeatures.hasDrawcord) groups.push('drawcord');
+        return groups;
+      })()
+    : ['body', 'sleeve'];
+
+  // ── Wizard steps (5 steps, no Materials) ─────────────────────────────────
+
+  const WIZARD_STEPS = [
+    { label: 'Features', status: (stepStatuses.features || 'unconfirmed') as StepStatus },
+    { label: 'POM',      status: (stepStatuses.pom      || 'unconfirmed') as StepStatus },
+    { label: 'Size Run', status: (stepStatuses.sizerun  || 'not_started') as StepStatus },
+    { label: 'BOM',      status: (stepStatuses.bom      || 'unconfirmed') as StepStatus },
+    { label: 'Cost',     status: 'not_started' as StepStatus },
+  ];
+
+  // ── Delete project ────────────────────────────────────────────────────────
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${params.id}`, { method: 'DELETE' });
+      if (res.ok) router.push('/');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }
+
+  // ── Confirm step helper ───────────────────────────────────────────────────
+
+  async function confirmStep(statusKey: string, nextStep?: number) {
+    await fetch(`/api/projects/${params.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [statusKey]: 'confirmed' }),
+    });
+    refreshAll();
+    if (nextStep) goToStep(nextStep);
+  }
+
+  // ── Sidebar step statuses (5 steps: Features, POM, Size Run, BOM, Cost) ────
+
+  const sidebarStatuses = {
+    features: (stepStatuses.features || 'unconfirmed') as StepStatus,
+    pom:      (stepStatuses.pom      || 'unconfirmed') as StepStatus,
+    sizerun:  (stepStatuses.sizerun  || 'not_started') as StepStatus,
+    bom:      (stepStatuses.bom      || 'unconfirmed') as StepStatus,
+    cost:     'unconfirmed' as StepStatus,
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 56px)' }}>
 
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-          <Link href="/" className="hover:text-gray-600 transition">Projects</Link>
-          <span>/</span>
-          <span className="text-gray-600">{project.title}</span>
-        </div>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm text-gray-500">
-                {CATEGORY_LABELS[project.category] ?? project.category}
-              </span>
-              {project.base_size && (
-                <span className="text-sm text-gray-400">· Size {project.base_size}</span>
-              )}
-              {project.fit && (
-                <span className="text-sm text-gray-400 capitalize">· {project.fit}</span>
-              )}
-            </div>
-          </div>
-          <StatusBadge status={project.status} />
-        </div>
-
-        {/* Processing progress bar */}
-        {project.status === 'processing' && job && (
-          <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Processing: {job.step}</span>
-              <span>{job.progress}%</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-2">
-              <div
-                className="bg-primary h-2 rounded-full transition-all duration-500"
-                style={{ width: `${job.progress}%` }}
-              />
-            </div>
-          </div>
+      {/* Project header */}
+      <div style={{
+        padding: '0.75rem 1.5rem',
+        borderBottom: '1px solid var(--color-border)',
+        background: 'var(--color-surface)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        flexShrink: 0,
+      }}>
+        <a href="/projects" style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', textDecoration: 'none' }}>
+          Projects
+        </a>
+        <span style={{ color: 'var(--color-border)' }}>/</span>
+        <h1 style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--color-text)', margin: 0 }}>
+          {project.style_name}
+        </h1>
+        {project.style_number && (
+          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+            {project.style_number}
+          </span>
         )}
-      </div>
-
-      {/* Tab navigation */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex gap-0 overflow-x-auto">
-          {TABS.map(({ id, label }) => (
+        {project.season && (
+          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-tertiary)' }}>
+            · {project.season}
+          </span>
+        )}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <a
+            href={`/api/projects/${params.id}/export/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              padding: '0.375rem 0.875rem',
+              border: '1px solid var(--color-border)',
+              borderRadius: '6px',
+              fontSize: '0.8125rem',
+              textDecoration: 'none',
+              color: 'var(--color-text)',
+              background: 'var(--color-surface)',
+            }}
+          >
+            Export PDF
+          </a>
+          {!showDeleteConfirm ? (
             <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition ${
-                tab === id
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{
+                padding: '0.375rem 0.625rem',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                fontSize: '0.8125rem',
+                color: 'var(--color-text-tertiary)',
+                background: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
             >
-              {label}
+              Delete
             </button>
-          ))}
-        </nav>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                Delete project?
+              </span>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  padding: '0.375rem 0.75rem',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.8125rem',
+                  color: '#fff',
+                  background: 'var(--color-error)',
+                  cursor: deleting ? 'default' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete'}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  padding: '0.375rem 0.625rem',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '6px',
+                  fontSize: '0.8125rem',
+                  color: 'var(--color-text)',
+                  background: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Tab content */}
-      <div className="min-h-[500px]">
-        {tab === 'overview' && (
-          <OverviewTab
-            project={project}
-            hasAssets={hasAssets}
-            measurementCount={measurementCount}
-            onRefresh={fetchStatus}
+      {/* Two-column */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+        {/* Main column */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+          <WizardNav
+            steps={WIZARD_STEPS}
+            currentStep={currentStep}
+            onStepChange={goToStep}
           />
-        )}
 
-        {tab === 'flat-sketch' && (
-          <FlatSketchTab
-            projectId={project.id}
-            hasAssets={hasAssets}
-            onRefresh={fetchStatus}
-          />
-        )}
+          {/* Step content */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {currentStep === 1 && (
+              <Step1Features
+                projectId={params.id}
+                photoUrl={photoUrl}
+                initialFeatures={confirmedFeatures}
+                aiAnalysis={project.ai_analysis_json ? JSON.parse(project.ai_analysis_json) as Record<string, unknown> : null}
+                onFeaturesChange={() => { fetchBom(); sidebarRef.current?.refresh(); }}
+                onConfirm={() => confirmStep('step_features_status', 2)}
+              />
+            )}
 
-        {tab === 'measurements' && (
-          <MeasurementsTab
-            projectId={project.id}
-            hasFlatFront={hasAssets.flat_front}
-            baseSize={project.base_size}
-            fit={project.fit}
-          />
-        )}
+            {/* Step 2 = POM (was step 3) */}
+            {currentStep === 2 && (
+              <Step3POM
+                key={`pom-${measurements.length}`}
+                projectId={params.id}
+                sketchUrl={sketchUrl}
+                photoUrl={photoUrl}
+                measurements={measurements as Parameters<typeof Step3POM>[0]['measurements']}
+                baseSize={(project.base_size || 'M') as Parameters<typeof Step3POM>[0]['baseSize']}
+                visibleGroups={visibleGroups}
+                onMeasurementChange={() => fetchMeasurements()}
+                onConfirm={() => confirmStep('step_pom_status', 3)}
+              />
+            )}
 
-        {tab === 'bom' && (
-          <BomTab projectId={project.id} />
-        )}
+            {/* Step 3 = Size Run (was step 4) */}
+            {currentStep === 3 && (
+              <Step4SizeRun
+                projectId={params.id}
+                baseSize={(project.base_size || 'M') as Parameters<typeof Step4SizeRun>[0]['baseSize']}
+                category={project.category}
+                measurements={measurements as Parameters<typeof Step4SizeRun>[0]['measurements']}
+                initialSizeRun={sizeRun as Parameters<typeof Step4SizeRun>[0]['initialSizeRun']}
+                onConfirm={() => confirmStep('step_sizerun_status', 4)}
+              />
+            )}
 
-        {tab === 'construction' && (
-          <ConstructionTab projectId={project.id} />
-        )}
+            {/* Step 4 = BOM */}
+            {currentStep === 4 && (
+              <Step5BOM
+                projectId={params.id}
+                subType={project.sub_type ?? undefined}
+                initialBomItems={bomItems as Parameters<typeof Step5BOM>[0]['initialBomItems']}
+                bomLoaded={bomLoaded}
+                onCostChange={() => sidebarRef.current?.refresh()}
+                onConfirm={() => confirmStep('step_bom_status', 5)}
+              />
+            )}
 
-        {tab === 'export' && (
-          <ExportTab
-            projectId={project.id}
-            hasAssets={hasAssets}
-            measurementCount={measurementCount}
-          />
-        )}
+            {/* Step 5 = Cost */}
+            {currentStep === 5 && (
+              <Step5Cost
+                projectId={params.id}
+                subType={(project.sub_type as SubType) ?? undefined}
+                onCostChange={() => sidebarRef.current?.refresh()}
+                onExportPdf={() => window.open(`/api/projects/${params.id}/export/pdf`, '_blank')}
+              />
+            )}
+          </div>
+
+          {/* Back / Next navigation footer */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            padding: '0.75rem 1.5rem',
+            borderTop: '1px solid var(--color-border)',
+            background: 'var(--color-surface)',
+            flexShrink: 0,
+          }}>
+            <button
+              onClick={() => currentStep > 1 && goToStep(currentStep - 1)}
+              disabled={currentStep === 1}
+              style={{
+                padding: '0.5rem 1rem',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                background: 'none',
+                color: currentStep === 1 ? 'var(--color-text-tertiary)' : 'var(--color-text)',
+                cursor: currentStep === 1 ? 'default' : 'pointer',
+                fontFamily: 'inherit',
+                fontSize: '0.875rem',
+              }}
+            >
+              ← Back
+            </button>
+            {currentStep < 5 && (
+              <button
+                onClick={() => goToStep(currentStep + 1)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '6px',
+                  background: 'none',
+                  color: 'var(--color-text)',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Next Step →
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Cost sidebar */}
+        <CostSidebar
+          ref={sidebarRef}
+          projectId={params.id}
+          stepStatuses={sidebarStatuses}
+        />
       </div>
     </div>
-  );
-}
-
-// ── Helper components ─────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    uploaded:   'bg-gray-100 text-gray-600',
-    processing: 'bg-blue-50 text-blue-700 animate-pulse',
-    ready:      'bg-green-50 text-green-700',
-    error:      'bg-red-50 text-red-700',
-  };
-  return (
-    <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${styles[status] ?? ''}`}>
-      {status}
-    </span>
   );
 }

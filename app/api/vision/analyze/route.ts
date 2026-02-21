@@ -7,10 +7,10 @@ import {
   upsertMeasurement,
 } from "@/lib/db";
 import type { SubType, FitType } from "@/lib/db";
-import { readFile, fileExists, FILES } from "@/lib/storage";
+import { readFile, fileExists, FILES, originalFilename, MAX_INSPIRATION_IMAGES } from "@/lib/storage";
 import { analyzeGarmentExpanded } from "@/lib/ai/expandedAnalysis";
 import { type GarmentCategory, VisionParsingError } from "@/lib/ai/types";
-import { computeMeasurements } from "@/lib/templates/measurements";
+import { computeMeasurements, POM_GROUP_MAP } from "@/lib/templates/measurements";
 
 export const runtime = "nodejs";
 
@@ -54,29 +54,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  // Find the image to analyze — prefer original upload
-  let imageBuffer: Buffer;
-  let mimeType = "image/png";
+  // Collect all uploaded inspiration images (primary + up to 4 additional)
+  function detectMime(buf: Buffer): string {
+    if (buf[0] === 0xff && buf[1] === 0xd8) return "image/jpeg";
+    if (buf[0] === 0x89 && buf[1] === 0x50) return "image/png";
+    if (buf[0] === 0x52 && buf[1] === 0x49) return "image/webp";
+    return "image/png";
+  }
 
-  if (fileExists(projectId, FILES.ORIGINAL)) {
-    imageBuffer = readFile(projectId, FILES.ORIGINAL);
-    // Detect mime type from file header
-    const header = imageBuffer.subarray(0, 4);
-    if (header[0] === 0xff && header[1] === 0xd8) mimeType = "image/jpeg";
-    else if (header[0] === 0x89 && header[1] === 0x50) mimeType = "image/png";
-  } else {
+  if (!fileExists(projectId, FILES.ORIGINAL)) {
     return NextResponse.json(
       { error: "No original image found for this project. Upload an image first." },
       { status: 404 },
     );
   }
 
+  const primaryBuffer = readFile(projectId, FILES.ORIGINAL);
+  const additionalImages: Array<{ buffer: Buffer; mimeType: string }> = [];
+
+  for (let i = 2; i <= MAX_INSPIRATION_IMAGES; i++) {
+    const fname = originalFilename(i);
+    if (fileExists(projectId, fname)) {
+      const buf = readFile(projectId, fname);
+      additionalImages.push({ buffer: buf, mimeType: detectMime(buf) });
+    }
+  }
+
   // Run the expanded analysis
   let analysis;
   try {
     analysis = await analyzeGarmentExpanded({
-      imageBuffer,
-      mimeType,
+      imageBuffer: primaryBuffer,
+      mimeType:    detectMime(primaryBuffer),
+      additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
       categoryHint: project.category as GarmentCategory,
     });
   } catch (err) {
@@ -116,14 +126,17 @@ export async function POST(req: NextRequest) {
 
     for (const m of computed) {
       upsertMeasurement({
-        id:             nanoid(),
-        project_id:     projectId,
-        measurement_id: m.measurement_id,
-        label:          m.label,
-        value_inches:   m.value_inches,
-        tolerance:      m.tolerance,
-        notes:          m.description,
-        sort_order:     m.sort_order,
+        id:               nanoid(),
+        project_id:       projectId,
+        measurement_id:   m.measurement_id,
+        label:            m.label,
+        measurement_point: m.description,
+        group_name:       POM_GROUP_MAP[m.measurement_id] ?? 'body',
+        base_value:       m.value_inches,
+        tolerance:        m.tolerance,
+        unit:             'inches',
+        notes:            null,
+        sort_order:       m.sort_order,
       });
     }
 
