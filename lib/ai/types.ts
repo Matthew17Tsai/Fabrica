@@ -29,6 +29,10 @@ export interface GarmentFeatures {
   drawcord?: boolean;
   ribHem?: boolean;
   ribCuff?: boolean;
+  /** Zipper pull style — only meaningful when zip=true */
+  zipperPullType?: "metal_tab" | "loop_pull" | "none";
+  /** Pocket opening style — only meaningful when kangarooPocket=true */
+  pocketType?: "split_kangaroo" | "continuous_kangaroo" | "none";
 }
 
 export interface GarmentParamsResult {
@@ -88,12 +92,30 @@ export interface ConstructionDetails {
   seam_type: "flatlock" | "overlock" | "coverstitch";
   hem_style: "rib" | "raw" | "folded" | "elastic";
   cuff_style: "rib" | "raw" | "elastic" | "open";
+  /** How far past the natural shoulder the sleeve attaches */
+  shoulder_drop?: "none" | "slight" | "exaggerated";
+  /** Where the hem sits relative to the hip */
+  body_length?: "cropped" | "regular" | "longline";
 }
 
 export interface BrandingInfo {
   position: string;     // e.g., "left chest"
   type: string;         // e.g., "embroidered logo"
   description: string;
+}
+
+/** Categorical proportion descriptors used to guide Recraft sketch proportions */
+export interface ProportionInfo {
+  /** Overall body silhouette shape */
+  silhouette?: "A-line" | "rectangular" | "trapezoid";
+  /** Body aspect ratio */
+  widthToLength?: "wider_than_tall" | "square" | "taller_than_wide";
+  /** Hood size relative to body (hoodie only) */
+  hoodSize?: "small" | "standard" | "large";
+  /** Kangaroo pocket width relative to body width */
+  pocketWidth?: "narrow" | "medium" | "wide";
+  /** Whether shoulder width is wider or narrower than hem width */
+  shoulderVsHem?: "shoulders_narrower" | "same_width" | "shoulders_wider";
 }
 
 export interface ExpandedAnalysis {
@@ -110,4 +132,5 @@ export interface ExpandedAnalysis {
   color: ColorInfo;
   construction: ConstructionDetails;
   branding?: BrandingInfo;
+  proportions?: ProportionInfo;
 }

@@ -38,19 +38,31 @@ export function deleteProjectFiles(projectId: string): void {
   }
 }
 
-// Standard filenames
+/** Standard filenames for project assets */
 export const FILES = {
-  ORIGINAL:       'original.png',
-  PREPROCESSED:   'preprocessed.png',
-  LINEART:        'lineart.png',
-  SVG:            'flatsketch.svg',          // legacy / single-view SVG
-  // Phase 3 — Recraft-generated flat sketches (front + back)
-  FLAT_SVG_FRONT: 'flatsketch_front.svg',
-  FLAT_SVG_BACK:  'flatsketch_back.svg',
-  FLAT_PNG_FRONT: 'flatsketch_front.png',
-  FLAT_PNG_BACK:  'flatsketch_back.png',
+  // Uploaded photos
+  PHOTO_FRONT:       'photo_front.png',
+  PHOTO_BACK:        'photo_back.png',
+  PHOTO_DETAIL:      'photo_detail.png',
+  PHOTO_OTHER:       'photo_other.png',
+  // Legacy photo name (used by Vision analysis route)
+  ORIGINAL:          'original.png',
+  // Uploaded flat sketches (user-provided)
+  SKETCH_FRONT:      'sketch_front.png',
+  SKETCH_BACK:       'sketch_back.png',
+  // AI-generated flat sketches (Gemini)
+  AI_SKETCH_FRONT:   'ai_sketch_front.png',
+  AI_SKETCH_BACK:    'ai_sketch_back.png',
   // Tech pack exports
-  TECHPACK_JSON:  'techpack.json',
-  TECHPACK_PDF:   'techpack.pdf',
-  TECHPACK_XLSX:  'techpack.xlsx',
+  TECHPACK_PDF:      'techpack.pdf',
+  TECHPACK_XLSX:     'techpack.xlsx',
+  TECHPACK_JSON:     'techpack.json',
 } as const;
+
+/** Filename for inspiration images by index (1 = primary photo). */
+export function originalFilename(index: number): string {
+  return index <= 1 ? 'original.png' : `original_${index}.png`;
+}
+
+/** Max number of inspiration images per project. */
+export const MAX_INSPIRATION_IMAGES = 5;

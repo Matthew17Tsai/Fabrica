@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Fabrica',
-  description: 'Convert sketches to flat sketches and tech packs',
+  title: 'Fabrica — Design to Price',
+  description: 'Upload your design, confirm every detail, export a factory-ready tech pack with accurate costing.',
 }
 
 export default function RootLayout({
@@ -13,18 +13,39 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16 items-center">
-              <a href="/" className="text-2xl font-bold text-primary">
-                Fabrica
+        <nav style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
+          <div className="max-w-screen-xl mx-auto px-6 h-14 flex items-center justify-between">
+            <a
+              href="/"
+              className="text-base font-semibold tracking-tight"
+              style={{ color: 'var(--color-text)' }}
+            >
+              Fabrica
+            </a>
+            <div className="flex items-center gap-6">
+              <a
+                href="/projects"
+                className="text-sm"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                Projects
               </a>
-              <div className="flex gap-4">
-                <a href="/new" className="text-secondary hover:text-gray-900 transition">
-                  Upload design
-                </a>
-              </div>
+              <a
+                href="/new"
+                className="text-sm px-3 py-1.5 rounded font-medium"
+                style={{ background: 'var(--color-accent)', color: '#fff' }}
+              >
+                New Project
+              </a>
             </div>
           </div>
         </nav>

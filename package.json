@@ -12,6 +12,7 @@
     "generate:samples": "node scripts/generate-samples.js"
   },
   "dependencies": {
+    "@google/genai": "^1.42.0",
     "@types/better-sqlite3": "^7.6.0",
     "@types/papaparse": "^5.3.0",
     "better-sqlite3": "^12.6.2",

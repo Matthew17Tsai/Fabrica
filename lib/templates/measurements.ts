@@ -206,3 +206,94 @@ export function computeMeasurements(
 export function inchesToCm(inches: number): number {
   return Math.round(inches * 2.54 * 10) / 10;
 }
+
+// ── Group mapping ─────────────────────────────────────────────────────────────
+
+export const POM_GROUP_MAP: Record<string, string> = {
+  // body
+  body_length:      'body',
+  chest_width:      'body',
+  shoulder_across:  'body',
+  hem_width:        'body',
+  front_length:     'body',
+  neck_opening:     'body',
+  armhole_straight: 'body',
+  armhole_curved:   'body',
+  neckband_width:   'body',
+  neckband_height:  'body',
+  // sleeve
+  sleeve_length:    'sleeve',
+  upper_arm:        'sleeve',
+  cuff_width:       'sleeve',
+  cuff_height:      'sleeve',
+  hem_rib_height:   'sleeve',
+  // hood
+  hood_height:      'hood',
+  hood_width:       'hood',
+  // pocket
+  pocket_width:     'pocket',
+  pocket_height:    'pocket',
+  side_pocket_depth:'pocket',
+  back_pocket_width:'pocket',
+  // zipper
+  zipper_length:    'zipper',
+  // drawcord
+  drawcord_length:  'drawcord',
+  // pants-specific
+  waist_relaxed:    'body',
+  waist_stretched:  'body',
+  hip_width:        'body',
+  front_rise:       'body',
+  back_rise:        'body',
+  inseam:           'body',
+  outseam:          'body',
+  thigh_width:      'body',
+  knee_width:       'body',
+  leg_opening:      'body',
+  waistband_height: 'body',
+};
+
+export interface MeasurementTemplateRow {
+  measurement_id:    string;
+  label:             string;
+  measurement_point: string | null;
+  group_name:        string;
+  base_value:        number | null;
+  tolerance:         number;
+  unit:              string;
+  notes:             string | null;
+  sort_order:        number;
+}
+
+/**
+ * Get measurement template rows in the new wizard schema format.
+ * Filters to only include groups that are visible based on confirmed features.
+ */
+export function getMeasurementTemplate(
+  category: string,
+  subType: SubType,
+  size: BaseSize,
+  visibleGroups: string[] = ['body', 'sleeve'],
+): MeasurementTemplateRow[] {
+  const defs  = getPomDefinitions(category, subType);
+  const sizeIdx = SIZE_INDEX[size] ?? SIZE_INDEX['M'];
+
+  return defs
+    .map((def, i) => {
+      const group = POM_GROUP_MAP[def.measurement_id] ?? 'body';
+      const sized = def.base_m + (sizeIdx - 2) * def.grade;
+      const base_value = Math.round(sized * 8) / 8;
+      return {
+        measurement_id:    def.measurement_id,
+        label:             def.label,
+        measurement_point: def.description,
+        group_name:        group,
+        base_value,
+        tolerance:         def.tolerance,
+        unit:              'inches',
+        notes:             null,
+        sort_order:        i,
+      };
+    })
+    .filter(row => visibleGroups.includes(row.group_name));
+}
