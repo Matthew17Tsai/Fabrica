@@ -77,48 +77,53 @@ function buildPocketRules(description: string, featureLines: string): string {
 }
 
 function buildFrontPrompt(description: string, featureLines: string): string {
-  const featuresSection = featureLines
-    ? `\n\nConfirmed construction features — draw ALL of these, EXACTLY as described:\n${featureLines}`
-    : '';
-
   const pocketRules = buildPocketRules(description, featureLines);
 
-  const accuracyRules = `
+  const featuresBlock = featureLines
+    ? `These are the ONLY construction features on this garment:\n${featureLines}`
+    : `These are the ONLY construction features on this garment:\n- Standard seams and silhouette only`;
 
-CRITICAL ACCURACY RULES:
-- ONLY draw features explicitly listed. Do NOT invent features not in the list.
-- Do NOT add back pockets, back vents, or back details unless explicitly listed as back features.${pocketRules}`;
+  return `Create a professional flat fashion technical sketch (FRONT VIEW) of: ${description}
 
-  return `Create a professional flat fashion technical sketch — front view — of ${description}.${featuresSection}${accuracyRules}
+${featuresBlock}
 
-Requirements:
-- Black linework on pure white background
-- Heavy outer silhouette, thinner lines for seams and topstitching
-- Show all construction details: seams, pockets, closures, zippers, stitching
-- No shading, no model, no texture, no colour fill
-- Flat lay perspective, symmetrical
-- Tech pack style, clean and production-ready`;
+ABSOLUTE RULES — VIOLATIONS WILL RUIN THE SKETCH:
+
+1. ONLY draw what is listed above. If a feature is NOT listed, it does NOT exist on this garment. Do NOT invent, add, or embellish anything. A simple garment MUST produce a simple sketch.
+
+2. Pockets: Draw pockets EXACTLY as described above. If it says "side seam pockets" draw simple straight openings at the side seam. If it says "kangaroo pocket" draw one continuous pouch. Do NOT create angular, geometric, or decorative pocket shapes that are not described.${pocketRules}
+
+3. SIMPLICITY IS CORRECT. If the garment is basic (plain t-shirt, simple sweatpants, basic hoodie), the sketch should have very few internal lines. Resist the urge to add detail. Empty space is accurate.
+
+4. Style: Pure black linework on pure white background. Heavy outline for silhouette. Lighter lines for seams. Dashed lines for topstitching only where described. FLAT LAY perspective, perfectly symmetrical.
+
+5. NO shading, NO gradients, NO shadows, NO color, NO texture, NO wrinkles, NO model, NO mannequin, NO background elements.
+
+6. Reference the photo closely. The sketch should match the ACTUAL garment in the photo — same proportions, same silhouette, same pocket placement. If the photo shows simple straight pockets, draw simple straight pockets.
+
+Generate ONLY the front view image.`;
 }
 
 function buildBackPrompt(description: string, featureLines: string): string {
   const pocketRules = buildPocketRules(description, featureLines);
 
-  const backNote = `
+  const featuresBlock = featureLines
+    ? `Confirmed features for reference:\n${featureLines}`
+    : '';
 
-IMPORTANT: The back view must ONLY show features visible from the back. Features on the front panel or side seams do NOT appear on the back sketch.${pocketRules}${
-  featureLines
-    ? `\n\nConfirmed features for reference:\n${featureLines}`
-    : ''
-}`;
+  return `Now create the BACK VIEW of the EXACT same garment.
 
-  return `Now create the back view of the same garment with identical line weight and style.${backNote}
+CRITICAL: The back should be SIMPLER than the front. Most garments have fewer details on the back. Do NOT add back pockets, vents, or details unless they are specifically listed in the features above.${pocketRules}
 
-Requirements:
-- Same line weight and style as the front view you just generated
-- Show back construction: back panel, yoke seam — only add pockets or closures if explicitly listed as back features
-- No shading, no model, no texture, no colour fill
-- Flat lay perspective, symmetrical
-- Tech pack style, clean and production-ready`;
+Features that are front-only (front zipper, front pockets, front closure) must NOT appear on the back view.
+${featuresBlock ? `\n${featuresBlock}\n` : ''}
+CONSISTENCY RULES:
+- IDENTICAL silhouette: same width, length, and proportions as the front
+- IDENTICAL line weights: same outline thickness, same seam lines
+- If the front is simple, the back must be EVEN SIMPLER
+
+Same style: black linework on white, no shading, no model, no color.
+Generate ONLY the back view image.`;
 }
 
 function extractImage(
