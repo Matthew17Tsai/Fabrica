@@ -1,4 +1,4 @@
-# Fabrica
+# Fabrica (ProductCreation)
 
 Convert sketches and design images into editable flat sketches and complete tech packs.
 
