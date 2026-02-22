@@ -11,6 +11,7 @@
 
 import { GoogleGenAI } from '@google/genai';
 import fs from 'node:fs';
+import sharp from 'sharp';
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash-exp-image-generation';
 
@@ -20,8 +21,75 @@ const GARMENT_HINTS: Record<string, string> = {
   sweatpants: 'sweatpants with elastic waistband and drawcord, side pockets, tapered leg with rib ankle cuffs',
 };
 
-function buildFrontPrompt(description: string): string {
-  return `Create a professional flat fashion technical sketch — front view — of ${description}.
+/**
+ * Extract confirmed feature detail lines from ai_analysis_json.
+ * Returns a bullet-list string using the `detected_features[].detail` descriptions.
+ * Returns empty string if no detected_features in the JSON.
+ */
+function buildFeatureLines(aiAnalysisJson: string | null): string {
+  if (!aiAnalysisJson) return '';
+  try {
+    const analysis = JSON.parse(aiAnalysisJson) as {
+      detected_features?: Array<{ feature: string; detail: string }>;
+    };
+    const features = analysis.detected_features;
+    if (!features || features.length === 0) return '';
+    return features.map(f => `- ${f.detail || f.feature}`).join('\n');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Build pocket-specific accuracy rules derived from the description and feature lines.
+ * These are injected regardless of whether detected_features is available,
+ * to prevent Gemini hallucinating wrong pocket types (e.g. kangaroo on sweatpants).
+ */
+function buildPocketRules(description: string, featureLines: string): string {
+  const combined = (description + ' ' + featureLines).toLowerCase();
+  const rules: string[] = [];
+
+  const hasSideSeamPocket = combined.includes('side seam pocket') || combined.includes('side seam slit');
+  const hasSidePocket     = combined.includes('side pocket') || combined.includes('side pockets');
+  const hasKangaroo       = combined.includes('kangaroo');
+  const hasPatch          = combined.includes('patch pocket');
+  const hasBackPocket     = combined.includes('back pocket') || combined.includes('rear pocket');
+
+  if ((hasSideSeamPocket || (hasSidePocket && !hasKangaroo))) {
+    rules.push(
+      'SIDE POCKETS = narrow vertical slit openings along the side seam of the leg or body only. ' +
+      'Do NOT draw a kangaroo pouch, a patch pocket, or any pocket on the front panel center.',
+    );
+  }
+  if (hasKangaroo) {
+    rules.push('Draw a kangaroo/pouch pocket centered on the front lower panel.');
+  }
+  if (hasPatch && !hasKangaroo) {
+    rules.push('Draw a patch pocket (flat rectangular fabric sewn on surface).');
+  }
+  if (!hasBackPocket) {
+    rules.push('The back view must have NO pockets — do not add any patch, welt, or pouch to the back.');
+  }
+
+  return rules.length
+    ? '\n\nPOCKET ACCURACY (follow exactly):\n' + rules.map(r => `- ${r}`).join('\n')
+    : '';
+}
+
+function buildFrontPrompt(description: string, featureLines: string): string {
+  const featuresSection = featureLines
+    ? `\n\nConfirmed construction features — draw ALL of these, EXACTLY as described:\n${featureLines}`
+    : '';
+
+  const pocketRules = buildPocketRules(description, featureLines);
+
+  const accuracyRules = `
+
+CRITICAL ACCURACY RULES:
+- ONLY draw features explicitly listed. Do NOT invent features not in the list.
+- Do NOT add back pockets, back vents, or back details unless explicitly listed as back features.${pocketRules}`;
+
+  return `Create a professional flat fashion technical sketch — front view — of ${description}.${featuresSection}${accuracyRules}
 
 Requirements:
 - Black linework on pure white background
@@ -32,14 +100,26 @@ Requirements:
 - Tech pack style, clean and production-ready`;
 }
 
-const BACK_PROMPT = `Now create the back view of the same garment with identical line weight and style.
+function buildBackPrompt(description: string, featureLines: string): string {
+  const pocketRules = buildPocketRules(description, featureLines);
+
+  const backNote = `
+
+IMPORTANT: The back view must ONLY show features visible from the back. Features on the front panel or side seams do NOT appear on the back sketch.${pocketRules}${
+  featureLines
+    ? `\n\nConfirmed features for reference:\n${featureLines}`
+    : ''
+}`;
+
+  return `Now create the back view of the same garment with identical line weight and style.${backNote}
 
 Requirements:
 - Same line weight and style as the front view you just generated
-- Show back construction: back panel, yoke seam, back pockets, closures
+- Show back construction: back panel, yoke seam — only add pockets or closures if explicitly listed as back features
 - No shading, no model, no texture, no colour fill
 - Flat lay perspective, symmetrical
 - Tech pack style, clean and production-ready`;
+}
 
 function extractImage(
   candidates: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string } }> } }>,
@@ -63,10 +143,15 @@ export interface SketchPair {
  * Generate front + back flat sketches using multi-turn generateContent.
  * The back view request includes the front view response in the conversation
  * history, giving Gemini visual context for consistency.
+ *
+ * @param photoPath      Path to the garment photo
+ * @param description    Human-readable garment description for the prompt
+ * @param aiAnalysisJson Optional AI analysis JSON with detected_features for prompt accuracy
  */
 export async function generateSketchPair(
   photoPath: string,
   description: string,
+  aiAnalysisJson?: string | null,
 ): Promise<SketchPair> {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -74,8 +159,16 @@ export async function generateSketchPair(
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  const imageBytes  = fs.readFileSync(photoPath);
+  // Normalize orientation via EXIF before sending to Gemini.
+  // Mobile photos often have EXIF rotation; sharp.rotate() applies it so the
+  // model sees the garment upright rather than sideways.
+  const rawBytes    = fs.readFileSync(photoPath);
+  const imageBytes  = await sharp(rawBytes).rotate().png().toBuffer();
   const base64Image = imageBytes.toString('base64');
+
+  const featureLines = buildFeatureLines(aiAnalysisJson ?? null);
+  const frontPrompt  = buildFrontPrompt(description, featureLines);
+  const backPrompt   = buildBackPrompt(description, featureLines);
 
   // ── Turn 1: Front view ──────────────────────────────────────────────────────
 
@@ -86,7 +179,7 @@ export async function generateSketchPair(
         role: 'user',
         parts: [
           { inlineData: { mimeType: 'image/png', data: base64Image } },
-          { text: buildFrontPrompt(description) },
+          { text: frontPrompt },
         ],
       },
     ],
@@ -110,7 +203,7 @@ export async function generateSketchPair(
         role: 'user',
         parts: [
           { inlineData: { mimeType: 'image/png', data: base64Image } },
-          { text: buildFrontPrompt(description) },
+          { text: frontPrompt },
         ],
       },
       // Model's front view response (provides visual context for back view)
@@ -121,7 +214,7 @@ export async function generateSketchPair(
       // User follow-up: back view
       {
         role: 'user',
-        parts: [{ text: BACK_PROMPT }],
+        parts: [{ text: backPrompt }],
       },
     ],
     config: { responseModalities: ['IMAGE', 'TEXT'] },

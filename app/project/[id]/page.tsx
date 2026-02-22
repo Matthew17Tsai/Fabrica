@@ -276,9 +276,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <a
-            href={`/api/projects/${params.id}/export/pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={`/project/${params.id}/preview`}
             style={{
               padding: '0.375rem 0.875rem',
               border: '1px solid var(--color-border)',
@@ -289,7 +287,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
               background: 'var(--color-surface)',
             }}
           >
-            Export PDF
+            Preview & Export
           </a>
           {!showDeleteConfirm ? (
             <button
@@ -383,8 +381,10 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
                 measurements={measurements as Parameters<typeof Step3POM>[0]['measurements']}
                 baseSize={(project.base_size || 'M') as Parameters<typeof Step3POM>[0]['baseSize']}
                 visibleGroups={visibleGroups}
+                garmentCategory={project.category}
                 onMeasurementChange={() => fetchMeasurements()}
                 onConfirm={() => confirmStep('step_pom_status', 3)}
+                onSketchChange={() => sidebarRef.current?.refresh()}
               />
             )}
 

@@ -66,11 +66,10 @@ const CostSidebar = forwardRef<CostSidebarHandle, Props>(function CostSidebar(
   { projectId, stepStatuses },
   ref,
 ) {
-  const [data, setData]           = useState<CostData | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [frontLoaded, setFrontLoaded] = useState(false);
-  const [backLoaded, setBackLoaded]   = useState(false);
-  const [zooming, setZooming]     = useState<'front' | 'back' | null>(null);
+  const [data, setData]       = useState<CostData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sketchBuster, setSketchBuster] = useState(() => Date.now());
+  const [zooming, setZooming] = useState<'front' | 'back' | null>(null);
 
   const fetchCost = useCallback(async () => {
     try {
@@ -89,7 +88,13 @@ const CostSidebar = forwardRef<CostSidebarHandle, Props>(function CostSidebar(
     fetchCost();
   }, [fetchCost]);
 
-  useImperativeHandle(ref, () => ({ refresh: fetchCost }), [fetchCost]);
+  useImperativeHandle(ref, () => ({
+    refresh: () => {
+      fetchCost();
+      // Bust the sketch thumbnail cache so sidebar shows newly generated sketches.
+      setSketchBuster(Date.now());
+    },
+  }), [fetchCost]);
 
   const statuses = stepStatuses
     ? [
@@ -103,8 +108,9 @@ const CostSidebar = forwardRef<CostSidebarHandle, Props>(function CostSidebar(
 
   const confirmedCount = statuses ? statuses.filter(s => s === 'confirmed').length : 0;
 
-  const frontSrc = `/api/projects/${projectId}/ai-sketch?view=front`;
-  const backSrc  = `/api/projects/${projectId}/ai-sketch?view=back`;
+  // Include cache buster so thumbnails refresh after regeneration / version activation.
+  const frontSrc = `/api/projects/${projectId}/ai-sketch?view=front&t=${sketchBuster}`;
+  const backSrc  = `/api/projects/${projectId}/ai-sketch?view=back&t=${sketchBuster}`;
   const zoomSrc  = zooming === 'front' ? frontSrc : backSrc;
 
   return (
@@ -151,17 +157,15 @@ const CostSidebar = forwardRef<CostSidebarHandle, Props>(function CostSidebar(
           gap: '0.625rem',
         }}>
           <SketchThumb
+            key={`front-${sketchBuster}`}
             src={frontSrc}
             label="Front"
-            loaded={frontLoaded}
-            onLoad={() => setFrontLoaded(true)}
             onZoom={() => setZooming('front')}
           />
           <SketchThumb
+            key={`back-${sketchBuster}`}
             src={backSrc}
             label="Back"
-            loaded={backLoaded}
-            onLoad={() => setBackLoaded(true)}
             onZoom={() => setZooming('back')}
           />
         </div>
@@ -299,16 +303,13 @@ export default CostSidebar;
 function SketchThumb({
   src,
   label,
-  loaded,
-  onLoad,
   onZoom,
 }: {
   src: string;
   label: string;
-  loaded: boolean;
-  onLoad: () => void;
   onZoom: () => void;
 }) {
+  const [loaded,  setLoaded]  = useState(false);
   const [errored, setErrored] = useState(false);
 
   return (
@@ -317,7 +318,7 @@ function SketchThumb({
         <img
           src={src}
           alt={`${label} sketch`}
-          onLoad={onLoad}
+          onLoad={() => setLoaded(true)}
           onError={() => setErrored(true)}
           onClick={loaded ? onZoom : undefined}
           style={{

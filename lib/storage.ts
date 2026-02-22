@@ -31,6 +31,21 @@ export function writeFile(projectId: string, filename: string, data: Buffer | st
   fs.writeFileSync(getFilePath(projectId, filename), data);
 }
 
+/** Copy a file within a project directory. */
+export function copyFile(projectId: string, src: string, dst: string): void {
+  const dir = getProjectDir(projectId);
+  fs.copyFileSync(path.join(dir, src), path.join(dir, dst));
+}
+
+/** List filenames in a project directory that start with the given prefix. */
+export function listFiles(projectId: string, prefix: string): string[] {
+  const dir = getProjectDir(projectId);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter(f => f.startsWith(prefix))
+    .sort();
+}
+
 export function deleteProjectFiles(projectId: string): void {
   const dir = getProjectDir(projectId);
   if (fs.existsSync(dir)) {
